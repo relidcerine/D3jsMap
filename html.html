@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extract All Arcs</title>
-
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chroma-js@2.1.1"></script>
 </head>
 
 <body>
@@ -20,22 +20,17 @@
             .attr("width", width)
             .attr("height", height);
 
-        // Projection
-        let projection = d3.geoAlbers()
-            .rotate([-3, 0])
-            .center([-4, 28])
-            .scale(1800)
-            .translate([width / 2, height / 2]);
-
-        // Path generator
-        let path = d3.geoPath().projection(projection);
-
-        // Color scale for common arcs
-        let colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-
         d3.json("algeria.json").then((jsonData) => {
-            let geometries = jsonData.objects.countries.geometries;
+            let geometrie = jsonData.objects.countries.geometries;
             let map = topojson.feature(jsonData, jsonData.objects.countries).features;
+            var projection = d3.geoAlbers()
+                .rotate([-3, 0])
+                .center([-4, 28])
+                .scale(1800)
+                .translate([width / 2, height / 2]);
+
+            // Path generator
+            var path = d3.geoPath().projection(projection);
 
             // Draw map
             svg.selectAll("path")
@@ -43,75 +38,56 @@
                 .enter()
                 .append("path")
                 .attr("d", path)
-                .attr("stroke", "black")
-                .attr("fill", "white"); // Set the fill color to white for all paths
+                .style("stroke", "black")
+                .style("stroke-width", 1)
+                .style("fill", "none");
 
-            // Extract and log arcs
-            let allArcs = [];
-            for (let i = 0; i < geometries.length; i++) {
-                let geometry = geometries[i];
-                let arcs = geometry.arcs;
-                allArcs.push(arcs);
-                console.log(`Arcs for geometry ${i}:`, arcs);
-            }
+            let allArcs = geometrie.map(geometry => geometry.arcs);
 
             // Find and display common values between each pair of arcs
-            for (let i = 0; i < allArcs.length - 1; i++) {
+            let commonFeatures = [];
+            var ars = jsonData.objects.countries.geometries;
+            for (let i = 0; i < allArcs.length; i++) {
+                let arc1 = ars[i];
+
                 for (let j = i + 1; j < allArcs.length; j++) {
-                    console.log(allArcs[i], j, allArcs[j]);
-                    let commonValuesPair = findCommonValues(allArcs[i], allArcs[j]);
-                    console.log("Common values:", commonValuesPair);
+                    let arc2 = ars[j];
+                    let commonValuesPair = findCommonValues(arc1.arcs[0], arc2.arcs[0]);
 
-                    // Color common arcs with a unique color
                     if (commonValuesPair.length > 0) {
-                        const uniqueColor = colorScale(i * allArcs.length + j); // Generate a unique color
-                        // Draw the first arc
-                        svg.selectAll("path")
-                            .data([allArcs[i]])
-                            .enter()
-                            .append("path")
-                            .attr("d", path)
-                            .attr("stroke", uniqueColor)
-                            .attr("fill", "none");
+                        feature = {
+                            "arcs": [
+                                commonValuesPair
+                            ],
+                            "type": "LineString",
+                            "properties": {}
+                        };
+                        var provinces = topojson.feature(jsonData, feature);
 
-                        // Draw the second arc
-                        svg.selectAll("path")
-                            .data([allArcs[j]])
-                            .enter()
-                            .append("path")
+                        svg.append("path")
+                            .data([provinces])
                             .attr("d", path)
-                            .attr("stroke", uniqueColor)
-                            .attr("fill", "none");
+                            .style("stroke", getRandomColor())
+                            .style("stroke-width", 2)
+                            .style("fill", "none");
                     }
                 }
+
             }
+
+            function findCommonValues(array1, array2) {
+                return array2.filter(value => array1.includes(Math.abs(value + 1)) && value < 0);
+            }
+
+            function getRandomColor() {
+                // Utiliser Chroma.js pour générer une palette des couleurs différentes
+                const colorScale = chroma.scale('Set3').mode('lch').colors(118);
+                return colorScale[Math.floor(Math.random() * colorScale.length)];
+            }
+
         }).catch((error) => {
             console.error("Error loading JSON data:", error);
         });
-
-        // Function to find common values between two arrays
-        function findCommonValues(arr1, arr2) {
-            const flatArr1 = arr1.flat();
-            const flatArr2 = arr2.flat();
-
-            const getCommonPair = (value1, value2) => [value1, value2];
-
-            const commonValuesArr1 = flatArr1
-                .filter(value1 => value1 < 0)
-                .map(value1 => {
-                    const commonValue = (value1 + 1) * -1;
-                    return flatArr2.includes(commonValue) ? getCommonPair(value1, commonValue) : null;
-                }).filter(Boolean);
-
-            const commonValuesArr2 = flatArr2
-                .filter(value2 => value2 < 0)
-                .map(value2 => {
-                    const commonValue = (value2 + 1) * -1;
-                    return flatArr1.includes(commonValue) ? getCommonPair(value2, commonValue) : null;
-                }).filter(Boolean);
-
-            return [...commonValuesArr1, ...commonValuesArr2];
-        }
     </script>
 </body>
 
